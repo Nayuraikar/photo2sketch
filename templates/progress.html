@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Processing Video...</title>
+</head>
+<body>
+    <div style="text-align:center; margin-top:60px;">
+        <h1>Processing Your Video...</h1>
+        <div style="width: 80%; max-width: 400px; margin: 0 auto;">
+            <div id="progress-bar-bg" style="background: #eee; border-radius: 8px; height: 30px; width: 100%; overflow: hidden;">
+                <div id="progress-bar" style="background: #00b8d9; height: 100%; width: 0%; transition: width 0.3s;"></div>
+            </div>
+            <div id="progress-text" style="margin-top: 8px; color: #00b8d9;">Processing: 0%</div>
+        </div>
+    </div>
+    <script>
+        const jobId = "{{ job_id }}";
+        function pollProgress() {
+            fetch(`/progress/${jobId}`).then(r => r.json()).then(data => {
+                let percent = data.percent;
+                document.getElementById('progress-bar').style.width = percent + '%';
+                document.getElementById('progress-text').innerText = 'Processing: ' + percent + '%';
+                if (!data.done) {
+                    setTimeout(pollProgress, 500);
+                } else {
+                    window.location.href = `/result/${jobId}`;
+                }
+            });
+        }
+        pollProgress();
+    </script>
+</body>
+</html> 

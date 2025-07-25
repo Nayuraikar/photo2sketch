@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Photo2Sketch</title>
+</head>
+<body>
+    <div style="text-align:center; margin-top:60px;">
+        <h1>Photo2Sketch</h1>
+        <h2>Upload Image or Video</h2>
+        <form method="POST" action="/upload_sketch" enctype="multipart/form-data" style="margin-bottom: 1.5em;">
+            <input type="file" name="file" accept="image/*,video/*" required><br><br>
+            <button type="submit">Upload & Convert</button>
+        </form>
+        <a href="/video_feed">Start Live Camera Sketch</a>
+    </div>
+</body>
+</html>
