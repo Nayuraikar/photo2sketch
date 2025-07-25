@@ -8,6 +8,14 @@
         <h1>Processed Sketch Video</h1>
         <a href="{{ url_for('static', filename=video_filename) }}" download>Download Sketched Video</a>
         <br><br>
+        {% if metrics %}
+            <h2>Performance Metrics</h2>
+            <ul style="list-style:none; padding:0;">
+                {% for k, v in metrics.items() %}
+                    <li><b>{{ k }}</b>: {{ v }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
         <a href="/">⟵ Go Back & Upload Another</a>
     </div>
 </body>

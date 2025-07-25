@@ -3,20 +3,34 @@
 <head>
     <title>Live Sketch Generator</title>
     <style>
-        body {
-            text-align: center;
-            background-color: #f0f0f0;
-        }
-        h1 {
-            color: #333;
-        }
-        img {
-            border: 3px solid #333;
-        }
+        body { text-align: center; background-color: #f0f0f0; }
+        h1 { color: #333; }
+        img { border: 3px solid #333; }
     </style>
 </head>
 <body>
     <h1>Live Camera Feed with Sketch</h1>
     <img src="{{ url_for('video_feed') }}" width="600">
+    <div id="metrics" style="margin-top:20px;">
+        <h2>Real-Time Metrics</h2>
+        <ul style="list-style:none; padding:0;">
+            <li><b>PSNR</b>: <span id="psnr">N/A</span></li>
+            <li><b>SSIM</b>: <span id="ssim">N/A</span></li>
+            <li><b>MAE</b>: <span id="mae">N/A</span></li>
+            <li><b>MSE</b>: <span id="mse">N/A</span></li>
+        </ul>
+    </div>
+    <script>
+        function updateMetrics() {
+            fetch('/live_metrics').then(r => r.json()).then(data => {
+                document.getElementById('psnr').innerText = data.PSNR;
+                document.getElementById('ssim').innerText = data.SSIM;
+                document.getElementById('mae').innerText = data.MAE;
+                document.getElementById('mse').innerText = data.MSE;
+            });
+        }
+        setInterval(updateMetrics, 1000);
+        updateMetrics();
+    </script>
 </body>
 </html>

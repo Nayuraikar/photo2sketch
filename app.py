@@ -10,6 +10,8 @@ from PIL import Image
 from werkzeug.utils import secure_filename
 import threading
 import uuid
+from metrics_utils import compute_metrics
+from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -49,6 +51,8 @@ def transform_frame(frame):
 
 camera = cv2.VideoCapture(0)
 
+live_metrics = {'PSNR': 'N/A', 'SSIM': 'N/A', 'MAE': 'N/A', 'MSE': 'N/A'}
+
 def generate():
     while True:
         success, frame = camera.read()
@@ -58,6 +62,18 @@ def generate():
         sketch = transform_frame(frame)
         combined = np.hstack((frame, sketch))
         _, buffer = cv2.imencode('.jpg', combined)
+        try:
+            psnr_val = float(peak_signal_noise_ratio(frame, sketch, data_range=255))
+            ssim_val = float(structural_similarity(frame, sketch, channel_axis=-1, data_range=255))
+            mae_val = float(np.mean(np.abs(frame.astype(np.float32) - sketch.astype(np.float32))))
+            mse_val = float(np.mean((frame.astype(np.float32) - sketch.astype(np.float32)) ** 2))
+            live_metrics['PSNR'] = round(psnr_val, 2)
+            live_metrics['SSIM'] = round(ssim_val, 3)
+            live_metrics['MAE'] = round(mae_val, 2)
+            live_metrics['MSE'] = round(mse_val, 2)
+            print("Updated live metrics:", live_metrics)
+        except Exception as e:
+            print("Error updating live metrics:", e)
         yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
 
 @app.route('/')
@@ -67,6 +83,15 @@ def index():
 @app.route('/video_feed')
 def video_feed():
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/live_metrics')
+def get_live_metrics():
+    print("Live metrics requested:", live_metrics)
+    return live_metrics
+
+@app.route('/live')
+def live():
+    return render_template('live.html')
 
 # ========== Upload Route ==========
 
@@ -112,6 +137,12 @@ def upload_sketch():
             processed_frames = 0
             frame_idx = 0
             last_sketch = None
+            # Save frames for metrics
+            real_frames_dir = os.path.join('uploads', 'frames', 'testA')
+            fake_frames_dir = os.path.join('static', 'sketches', job_id)
+            os.makedirs(fake_frames_dir, exist_ok=True)
+            fake_frame_list = []
+            real_frame_list = []
             while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret:
@@ -120,14 +151,23 @@ def upload_sketch():
                 if frame_idx % 5 == 0:
                     last_sketch = transform_frame(frame)
                 out.write(last_sketch)
+                # Save frames for metrics
+                fake_frame_path = os.path.join(fake_frames_dir, f'frame_{frame_idx:04d}.jpg')
+                cv2.imwrite(fake_frame_path, last_sketch)
+                fake_frame_list.append(fake_frame_path)
+                real_frame_path = os.path.join(real_frames_dir, f'frame_{frame_idx:04d}.jpg')
+                real_frame_list.append(real_frame_path)
                 processed_frames += 1
                 jobs[job_id]['percent'] = int((processed_frames / total_frames) * 100)
                 frame_idx += 1
             cap.release()
             out.release()
+            # Compute metrics
+            metrics = compute_metrics(real_frames_dir, fake_frames_dir)
             jobs[job_id]['percent'] = 100
             jobs[job_id]['done'] = True
             jobs[job_id]['output_filename'] = output_filename
+            jobs[job_id]['metrics'] = metrics
         threading.Thread(target=process_video, daemon=True).start()
         return render_template("progress.html", job_id=job_id)
     else:
@@ -145,7 +185,8 @@ def get_result(job_id):
     job = jobs.get(job_id)
     if not job or not job['done']:
         return "Not ready", 404
-    return render_template("video_display.html", video_filename=job['output_filename'])
+    metrics = job.get('metrics', {})
+    return render_template("video_display.html", video_filename=job['output_filename'], metrics=metrics)
 
 # ========== MAIN ==========
 
